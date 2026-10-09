@@ -4,38 +4,75 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eaf7fc">
   <title>海洋プラスチックAI</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.3/dist/teachablemachine-image.min.js"></script>
 
   <style>
+    * { box-sizing: border-box; }
+
     body {
       margin: 0;
-      padding: 18px;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      color: #173b4a;
+      padding: 20px;
       background: #eaf7fc;
+      color: #173b4a;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
-    main { max-width: 760px; margin: auto; }
+    main {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      padding: 12px 0 18px;
+    }
+
+    h1 {
+      font-size: 27px;
+      margin-bottom: 8px;
+    }
+
+    header p {
+      color: #58727d;
+      font-size: 14px;
+    }
 
     .panel {
       background: white;
       padding: 18px;
-      margin: 16px 0;
-      border-radius: 16px;
-      box-shadow: 0 3px 12px #173b4a12;
+      margin: 14px 0;
+      border-radius: 18px;
+      box-shadow: 0 4px 16px #173b4a12;
+    }
+
+    video, #photo {
+      display: block;
+      width: 100%;
+      max-height: 420px;
+      object-fit: contain;
+      border-radius: 14px;
+      background: #173b4a;
+      margin: 12px auto;
+    }
+
+    #photo[hidden], video[hidden] {
+      display: none;
     }
 
     button {
-      padding: 12px 16px;
-      margin: 5px 4px 5px 0;
+      width: 100%;
+      padding: 15px;
+      margin-top: 10px;
       border: 0;
-      border-radius: 9px;
+      border-radius: 12px;
       background: #087eaa;
       color: white;
-      font-size: 15px;
+      font-size: 16px;
+      font-weight: 600;
       cursor: pointer;
     }
 
@@ -44,161 +81,191 @@
       cursor: not-allowed;
     }
 
-    video, canvas {
-      width: 100%;
-      max-width: 520px;
-      display: block;
-      margin: 12px auto;
-      border-radius: 12px;
-      background: #173b4a;
+    button.secondary {
+      color: #175064;
+      background: #e3f1f6;
     }
 
     #status {
+      text-align: center;
       white-space: pre-wrap;
-      background: #edf5f8;
-      border-radius: 8px;
-      padding: 12px;
       overflow-wrap: anywhere;
+      font-size: 14px;
+      line-height: 1.7;
+      padding: 12px;
+      border-radius: 10px;
+      background: #edf5f8;
     }
 
-    #result { font-size: 23px; font-weight: bold; }
+    #result {
+      text-align: center;
+      font-size: 28px;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+      margin: 16px 0 8px;
+    }
 
-    .score { margin: 12px 0; }
-    .bar { height: 12px; background: #dce8ed; border-radius: 8px; }
-    .fill { height: 100%; background: #16a0b7; border-radius: 8px; }
+    #confidence {
+      text-align: center;
+      color: #58727d;
+      font-size: 15px;
+    }
 
-    .small { font-size: 13px; line-height: 1.7; color: #58727d; }
+    #scores {
+      margin-top: 18px;
+    }
 
-    .table-wrap { overflow-x: auto; }
-    table { border-collapse: collapse; width: 100%; font-size: 13px; }
-    th, td { padding: 9px; border-bottom: 1px solid #dce8ed; text-align: left; }
+    .score-row { margin: 12px 0; }
 
-    @media(max-width: 500px) {
-      body { padding: 10px; }
-      button { width: 100%; margin: 5px 0; }
+    .score-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+
+    .bar {
+      height: 10px;
+      background: #e0e9ed;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .fill {
+      height: 100%;
+      background: #16a0b7;
+      border-radius: 10px;
+    }
+
+    .note {
+      text-align: center;
+      color: #58727d;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 450px) {
+      body { padding: 12px; }
+      .panel { padding: 14px; }
+      h1 { font-size: 23px; }
     }
   </style>
 </head>
 
 <body>
 <main>
-  <h1>🌊 海洋プラスチックAI</h1>
-  <p>浮いているゴミをAIで判別し、研究記録を保存します。</p>
+  <header>
+    <h1>🌊 海洋プラスチックAI</h1>
+    <p>写真を撮るだけで、AIがゴミの種類を判定します。</p>
+  </header>
 
   <section class="panel">
-    <h2>① AIモデル</h2>
-    <p id="status">AIモデルを読み込んでいます...</p>
-    <button id="reload">モデルを再読み込み</button>
-  </section>
-
-  <section class="panel">
-    <h2>② カメラ撮影</h2>
     <video id="video" autoplay playsinline muted></video>
+    <img id="photo" alt="撮影した写真" hidden>
+
     <button id="start" disabled>カメラを起動</button>
-    <button id="capture" disabled>撮影して判別</button>
-    <button id="stop" disabled>カメラを停止</button>
-    <canvas id="canvas" hidden></canvas>
-    <p class="small">初回はカメラの使用許可が必要です。HTTPSのGitHub Pages URLから開いてください。</p>
+    <button id="capture" disabled>撮影して判定・保存</button>
+    <button id="again" class="secondary hidden">もう一度撮影する</button>
   </section>
 
   <section class="panel">
-    <h2>③ 判別結果</h2>
-    <p id="result">まだ判別していません</p>
+    <p id="status">AIモデルを準備しています...</p>
+    <div id="result" aria-live="polite">準備中</div>
+    <p id="confidence"></p>
     <div id="scores"></div>
-    <button id="save" disabled>スプレッドシートに保存</button>
-    <p class="small">
-      保存ボタンを押すとGASへ送信します。ブラウザの制約により、
-      この画面だけではスプレッドシートへの保存完了を直接確認できません。
-      保存後はスプレッドシートでも確認してください。
-    </p>
   </section>
 
-  <section class="panel">
-    <h2>④ このブラウザでの送信履歴</h2>
-    <p id="count">0件</p>
-    <button id="csv">履歴をCSVで出力</button>
-    <button id="clear">このブラウザの履歴を削除</button>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>日時</th><th>判別結果</th><th>信頼度</th><th>状態</th></tr>
-        </thead>
-        <tbody id="history"></tbody>
-      </table>
-    </div>
-    <p class="small">
-      ここに表示される履歴はブラウザ内の控えです。
-      Googleスプレッドシートの全履歴を読み込んだものではありません。
-    </p>
-  </section>
+  <p class="note">
+    判定結果と撮影写真は研究記録として保存します。<br>
+    保存処理の状況は画面に表示します。
+  </p>
 </main>
 
 <script>
-  // ① あなたの保存用GASの公開URLを入れてください
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbwLnoOn4J9kl7G5PMA8LaXbKwWnVq-RAxbZ-Ct_VgRdjsdYy5U7fZ9ZLnWxVD0xUSZe/exec";
+  // 公開したGASウェブアプリのURL
+  const GAS_URL =
+    "https://script.google.com/macros/s/AKfycbwLnoOn4J9kl7G5PMA8LaXbKwWnVq-RAxbZ-Ct_VgRdjsdYy5U7fZ9ZLnWxVD0xUSZe/exec";
 
-  // ② 現在使っているTeachable Machineモデル
+  // 使用中のTeachable Machineモデル
   const MODEL_URL =
     "https://teachablemachine.withgoogle.com/models/xYekeb-z-";
 
-  const STORAGE_KEY = "marine_plastic_ai_send_history_v1";
-
   let model = null;
   let stream = null;
-  let latest = null;
-  let history = [];
+  let busy = false;
 
   const video = document.getElementById("video");
-  const canvas = document.getElementById("canvas");
-  const status = document.getElementById("status");
+  const photo = document.getElementById("photo");
   const startButton = document.getElementById("start");
   const captureButton = document.getElementById("capture");
-  const stopButton = document.getElementById("stop");
-  const saveButton = document.getElementById("save");
+  const againButton = document.getElementById("again");
+  const status = document.getElementById("status");
+  const result = document.getElementById("result");
+  const confidence = document.getElementById("confidence");
+  const scoresBox = document.getElementById("scores");
 
   function setStatus(message) {
     status.textContent = message;
   }
 
   async function loadModel() {
-    startButton.disabled = true;
-    captureButton.disabled = true;
-    saveButton.disabled = true;
-    setStatus("AIモデルを読み込んでいます...");
-
     try {
+      setStatus("AIを準備しています...");
+
       model = await tmImage.load(
-        MODEL_URL + "model.json",
-        MODEL_URL + "metadata.json"
+        MODEL_URL + "/model.json",
+        MODEL_URL + "/metadata.json"
       );
-      setStatus("AIモデルの読み込みに成功しました。");
+
       startButton.disabled = false;
+      result.textContent = "撮影してください";
+      setStatus("準備完了です。カメラを起動してください。");
     } catch (error) {
-      model = null;
-      setStatus("モデルを読み込めませんでした。\n" + String(error));
+      setStatus(
+        "AIを読み込めませんでした。\n" +
+        "モデルURLやインターネット接続を確認してください。"
+      );
+      result.textContent = "準備できませんでした";
+      console.error(error);
     }
   }
 
   async function startCamera() {
+    if (busy) return;
+
     try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("HTTPSのGitHub Pages URLで開いてください。");
+      if (!navigator.mediaDevices ||
+          !navigator.mediaDevices.getUserMedia) {
+        throw new Error("HTTPSのGitHub Pagesサイトから開いてください。");
       }
 
+      startButton.disabled = true;
+      setStatus("カメラを起動しています...");
+
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
         audio: false
       });
 
       video.srcObject = stream;
+      video.hidden = false;
+      photo.hidden = true;
+
       await video.play();
 
-      startButton.disabled = true;
       captureButton.disabled = false;
-      stopButton.disabled = false;
-      setStatus("カメラが起動しました。撮影できます。");
+      setStatus("ゴミを画面に映し、「撮影して判定・保存」を押してください。");
     } catch (error) {
-      setStatus("カメラを起動できませんでした。\n" + String(error));
+      stopCamera();
+      startButton.disabled = !model;
+      setStatus("カメラを起動できませんでした。\n" + error.message);
     }
   }
 
@@ -210,55 +277,88 @@
 
     video.srcObject = null;
     captureButton.disabled = true;
-    stopButton.disabled = true;
-    startButton.disabled = !model;
+    startButton.disabled = !model || busy;
   }
 
-  async function captureAndPredict() {
-    if (!model || !stream) return;
+  // 写真のサイズを小さくし、保存時の通信量を抑える
+  function makePhoto() {
+    const sourceWidth = video.videoWidth;
+    const sourceHeight = video.videoHeight;
 
+    if (!sourceWidth || !sourceHeight) {
+      throw new Error("カメラ映像を取得できません。");
+    }
+
+    const maxSide = 960;
+    const scale = Math.min(
+      1,
+      maxSide / Math.max(sourceWidth, sourceHeight)
+    );
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(sourceWidth * scale);
+    canvas.height = Math.round(sourceHeight * scale);
+
+    const context = canvas.getContext("2d");
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // JPEG形式に圧縮
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.65);
+
+    return { canvas, dataUrl };
+  }
+
+  async function captureAndSave() {
+    if (!model || !stream || busy) return;
+
+    busy = true;
     captureButton.disabled = true;
-    saveButton.disabled = true;
-    latest = null;
-    setStatus("AIで判別しています...");
+    startButton.disabled = true;
+    againButton.classList.add("hidden");
 
     try {
-      if (!video.videoWidth || !video.videoHeight) {
-        throw new Error("カメラ映像がまだ準備できていません。");
-      }
+      setStatus("写真を撮影しています...");
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext("2d").drawImage(
-        video, 0, 0, canvas.width, canvas.height
-      );
+      const { canvas, dataUrl } = makePhoto();
+
+      // 撮影した写真を画面に表示
+      photo.src = dataUrl;
+      photo.hidden = false;
+      video.hidden = true;
+
+      // AI判別
+      setStatus("AIがゴミの種類を判定しています...");
 
       const predictions = await model.predict(canvas);
       predictions.sort((a, b) => b.probability - a.probability);
 
-      latest = {
-        label: predictions[0].className,
-        confidence: predictions[0].probability,
-        scores: predictions.map(p => ({
-          className: p.className,
-          probability: p.probability
-        }))
-      };
+      if (!predictions.length) {
+        throw new Error("AIの判定結果がありません。");
+      }
 
-      document.getElementById("result").textContent =
-        latest.label + "（" +
-        (latest.confidence * 100).toFixed(1) + "%）";
+      const best = predictions[0];
 
-      const scoreBox = document.getElementById("scores");
-      scoreBox.replaceChildren();
+      result.textContent = best.className;
+      confidence.textContent =
+        "信頼度：" + (best.probability * 100).toFixed(1) + "%";
 
-      predictions.forEach(p => {
+      scoresBox.replaceChildren();
+
+      predictions.forEach(item => {
         const row = document.createElement("div");
-        row.className = "score";
+        row.className = "score-row";
 
-        const label = document.createElement("p");
-        label.textContent = p.className + "：" +
-          (p.probability * 100).toFixed(1) + "%";
+        const label = document.createElement("div");
+        label.className = "score-label";
+
+        const name = document.createElement("span");
+        name.textContent = item.className;
+
+        const percent = document.createElement("span");
+        percent.textContent =
+          (item.probability * 100).toFixed(1) + "%";
+
+        label.append(name, percent);
 
         const bar = document.createElement("div");
         bar.className = "bar";
@@ -266,43 +366,30 @@
         const fill = document.createElement("div");
         fill.className = "fill";
         fill.style.width =
-          Math.max(0, Math.min(100, p.probability * 100)) + "%";
+          Math.max(0, Math.min(100, item.probability * 100)) + "%";
 
         bar.appendChild(fill);
         row.append(label, bar);
-        scoreBox.appendChild(row);
+        scoresBox.appendChild(row);
       });
 
-      saveButton.disabled = false;
-      setStatus("判別完了。結果を確認して保存してください。");
-    } catch (error) {
-      setStatus("判別に失敗しました。\n" + String(error));
-    } finally {
-      captureButton.disabled = !stream;
-    }
-  }
+      // 写真と判定結果をGASへ送信
+      setStatus("写真と判定結果を保存しています...");
 
-  async function saveResult() {
-    if (!latest) return;
+      const record = {
+        label: best.className,
+        confidence: best.probability,
+        scores: predictions.map(item => ({
+          className: item.className,
+          probability: item.probability
+        })),
+        imageBase64: dataUrl.split(",")[1]
+      };
 
-    if (!GAS_URL.startsWith("https://script.google.com/macros/s/") ||
-        !GAS_URL.endsWith("/exec")) {
-      alert("HTML内のGAS_URLを、公開したウェブアプリの /exec URLに変更してください。");
-      return;
-    }
+      if (record.imageBase64.length > 1500000) {
+        throw new Error("写真のサイズが大きすぎます。");
+      }
 
-    saveButton.disabled = true;
-    setStatus("GASへ保存リクエストを送信しています...");
-
-    const record = {
-      label: latest.label,
-      confidence: latest.confidence,
-      scores: latest.scores
-    };
-
-    try {
-      // no-corsではレスポンス本文を読めないため、
-      // 送信できたことと、シートに保存されたことは区別します。
       await fetch(GAS_URL, {
         method: "POST",
         mode: "no-cors",
@@ -312,143 +399,51 @@
         body: JSON.stringify(record)
       });
 
-      const item = {
-        date: new Date().toISOString(),
-        label: record.label,
-        confidence: record.confidence,
-        scores: record.scores,
-        status: "送信要求済み・保存未確認"
-      };
-
-      history.unshift(item);
-
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-      } catch (storageError) {
-        setStatus(
-          "送信リクエストは完了しましたが、ブラウザ内の履歴を保存できませんでした。\n" +
-          "スプレッドシート側で保存結果を確認してください。"
-        );
-        renderHistory();
-        return;
-      }
-
-      renderHistory();
       setStatus(
-        "GASへの送信リクエストが完了しました。\n" +
-        "ブラウザから保存成功の返答は確認できないため、" +
-        "Googleスプレッドシートの「研究記録」シートを開いて保存を確認してください。"
+        "判定が完了し、保存リクエストを送信しました。\n" +
+        "ブラウザから保存成功を直接確認できないため、" +
+        "初回はスプレッドシートで記録を確認してください。"
       );
+
+      againButton.classList.remove("hidden");
+
     } catch (error) {
       setStatus(
-        "送信中に通信エラーが発生しました。\n" +
-        String(error) + "\nスプレッドシート側も確認してください。"
+        "処理を完了できませんでした。\n" +
+        error.message +
+        "\n通信状態や保存先の設定を確認してください。"
       );
+
+      againButton.classList.remove("hidden");
+      console.error(error);
     } finally {
-      saveButton.disabled = !latest;
+      stopCamera();
+      busy = false;
+      startButton.disabled = !model;
     }
   }
 
-  function renderHistory() {
-    const body = document.getElementById("history");
-    body.replaceChildren();
+  function takeAgain() {
+    if (busy) return;
 
-    document.getElementById("count").textContent =
-      history.length + "件";
+    photo.hidden = true;
+    photo.removeAttribute("src");
+    video.hidden = false;
 
-    history.slice(0, 200).forEach(item => {
-      const tr = document.createElement("tr");
+    result.textContent = "撮影してください";
+    confidence.textContent = "";
+    scoresBox.replaceChildren();
 
-      const values = [
-        new Date(item.date).toLocaleString("ja-JP"),
-        item.label,
-        (Number(item.confidence) * 100).toFixed(1) + "%",
-        item.status || "送信要求済み・保存未確認"
-      ];
+    againButton.classList.add("hidden");
+    setStatus("カメラを起動して、もう一度撮影してください。");
 
-      values.forEach(value => {
-        const td = document.createElement("td");
-        td.textContent = value;
-        tr.appendChild(td);
-      });
-
-      body.appendChild(tr);
-    });
+    startButton.disabled = !model;
   }
-
-  function downloadCSV() {
-    if (!history.length) {
-      alert("このブラウザに履歴がありません。");
-      return;
-    }
-
-    const rows = [
-      ["日時", "判別結果", "信頼度（%）", "送信状態", "各クラスのスコア"]
-    ];
-
-    history.forEach(item => {
-      const scores = (item.scores || []).map(s =>
-        s.className + ":" + (s.probability * 100).toFixed(1) + "%"
-      ).join(" / ");
-
-      rows.push([
-        new Date(item.date).toLocaleString("ja-JP"),
-        item.label,
-        (Number(item.confidence) * 100).toFixed(1),
-        item.status || "送信要求済み・保存未確認",
-        scores
-      ]);
-    });
-
-    const csv = "\uFEFF" + rows.map(row =>
-      row.map(value => '"' + String(value).replace(/"/g, '""') + '"')
-        .join(",")
-    ).join("\r\n");
-
-    const url = URL.createObjectURL(
-      new Blob([csv], { type: "text/csv;charset=utf-8;" })
-    );
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "海洋プラスチックAI_送信履歴.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function clearHistory() {
-    if (!confirm("このブラウザ内の履歴を削除しますか？\nスプレッドシートの記録は削除されません。")) {
-      return;
-    }
-
-    history = [];
-
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch (error) {
-      // 表示上の履歴は削除します。
-    }
-
-    renderHistory();
-  }
-
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    history = saved ? JSON.parse(saved) : [];
-    if (!Array.isArray(history)) history = [];
-  } catch (error) {
-    history = [];
-  }
-
-  renderHistory();
 
   startButton.addEventListener("click", startCamera);
-  captureButton.addEventListener("click", captureAndPredict);
-  stopButton.addEventListener("click", stopCamera);
-  saveButton.addEventListener("click", saveResult);
-  document.getElementById("reload").addEventListener("click", loadModel);
-  document.getElementById("csv").addEventListener("click", downloadCSV);
-  document.getElementById("clear").addEventListener("click", clearHistory);
+  captureButton.addEventListener("click", captureAndSave);
+  againButton.addEventListener("click", takeAgain);
+
   window.addEventListener("pagehide", stopCamera);
 
   loadModel();
