@@ -1,4 +1,4 @@
-```html
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -147,13 +147,12 @@
 <main>
   <header>
     <h1>🌊 海洋プラスチックAI</h1>
-    <p>ボタン1つで撮影・AI判定・研究記録の保存</p>
+    <p>撮影・AI判定・研究記録の保存</p>
   </header>
 
   <section class="panel">
     <video id="video" autoplay playsinline muted hidden></video>
     <img id="photo" alt="撮影した写真" hidden>
-
     <button id="action" disabled>AIを準備しています...</button>
   </section>
 
@@ -175,12 +174,9 @@
   const GAS_URL =
     "https://script.google.com/macros/s/AKfycbwLnoOn4J9kl7G5PMA8LaXbKwWnVq-RAxbZ-Ct_VgRdjsdYy5U7fZ9ZLnWxVD0xUSZe/exec";
 
-  // Teachable MachineのモデルURL
-  // model.json と metadata.json が存在するURLを設定する
   const MODEL_URL =
     "https://teachablemachine.withgoogle.com/models/xYekeb-z-";
 
-  // 保存確認を最大約30秒待つ
   const SAVE_TIMEOUT_MS = 30000;
 
   // ===== 状態管理 =====
@@ -214,9 +210,11 @@
     try {
       setStatus("AIモデルを読み込んでいます...");
 
+      const baseUrl = MODEL_URL.replace(/\/+$/, "");
+
       model = await tmImage.load(
-        MODEL_URL.replace(/\/+$/, "") + "/model.json",
-        MODEL_URL.replace(/\/+$/, "") + "/metadata.json"
+        baseUrl + "/model.json",
+        baseUrl + "/metadata.json"
       );
 
       setMode("start", "カメラを起動する");
@@ -240,9 +238,10 @@
   // ===== カメラ起動 =====
 
   async function startCamera() {
+    action.disabled = true;
+
     try {
       setStatus("カメラを起動しています...");
-      action.disabled = true;
 
       if (!navigator.mediaDevices ||
           !navigator.mediaDevices.getUserMedia) {
@@ -250,6 +249,9 @@
           "カメラにはHTTPSのサイト、またはlocalhostからアクセスしてください。"
         );
       }
+
+      // 以前のカメラが残っていれば停止
+      stopCamera();
 
       stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -280,7 +282,7 @@
         error.message
       );
 
-      setMode("start", "もう一度カメラを起動する");
+      setMode("start", "カメラを起動する");
     }
   }
 
@@ -376,7 +378,7 @@
     return best;
   }
 
-  // ===== GASに保存を依頼 =====
+  // ===== 保存状況を確認 =====
 
   function jsonpStatus(requestId) {
     return new Promise((resolve, reject) => {
@@ -386,6 +388,7 @@
         Math.random().toString(36).slice(2);
 
       const script = document.createElement("script");
+
       const timeout = setTimeout(() => {
         cleanup();
         reject(new Error("GASの保存結果を確認できません。"));
@@ -430,12 +433,16 @@
         }
 
         if (response && response.status === "error") {
-          throw new Error(response.message || "GASで保存に失敗しました。");
+          throw new Error(
+            response.message || "GASで保存に失敗しました。"
+          );
         }
+
       } catch (error) {
-        // 一時的な通信エラーは次の確認で再試行する
-        if (error.message &&
-            error.message.includes("GASで保存に失敗")) {
+        if (
+          error.message &&
+          error.message.includes("GASで保存に失敗")
+        ) {
           throw error;
         }
       }
@@ -445,16 +452,15 @@
 
     throw new Error(
       "保存結果を時間内に確認できませんでした。\n" +
-      "スプレッドシートとGoogle Driveを確認してください。"
+      "GASの実行履歴と保存先を確認してください。"
     );
   }
 
+  // ===== GASへ保存 =====
+
   async function saveRecord(record) {
-    // 同じIDで保存状況を照会できるようにする
     const requestId =
-      Date.now().toString(36) +
-      "-" +
-      crypto.randomUUID();
+      Date.now().toString(36) + "-" + crypto.randomUUID();
 
     record.requestId = requestId;
 
@@ -462,10 +468,8 @@
       throw new Error("写真が大きすぎます。");
     }
 
-    setStatus("写真と判定結果をGASに送信しています...");
+    setStatus("写真と判定結果を送信しています...");
 
-    // no-corsでは応答本文を直接読めないため、
-    // 別のJSONP確認処理で保存状況を問い合わせる
     await fetch(GAS_URL, {
       method: "POST",
       mode: "no-cors",
@@ -518,7 +522,8 @@
 
       setStatus(
         "保存成功！\n" +
-        (saved.message || "写真と判定結果を保存しました。")
+        (saved.message || "写真と判定結果を保存しました。") +
+        "\n分類：" + (saved.label || best.className)
       );
 
       setMode("again", "もう一度撮影する");
@@ -539,9 +544,9 @@
     }
   }
 
-  // ===== もう一度撮影 =====
+  // ===== もう一度撮影：自動でカメラ起動 =====
 
-  function resetForNextPhoto() {
+  async function resetForNextPhoto() {
     photo.hidden = true;
     photo.removeAttribute("src");
 
@@ -551,8 +556,9 @@
     confidence.textContent = "";
     scoresBox.replaceChildren();
 
-    setMode("start", "カメラを起動する");
-    setStatus("次の撮影を開始できます。");
+    setStatus("次の撮影を開始しています...");
+
+    await startCamera();
   }
 
   // ===== ボタンは1つだけ =====
@@ -565,7 +571,7 @@
     } else if (mode === "capture") {
       await captureAndSave();
     } else if (mode === "again") {
-      resetForNextPhoto();
+      await resetForNextPhoto();
     }
   });
 
@@ -575,4 +581,3 @@
 </script>
 </body>
 </html>
-```
